@@ -1,10 +1,9 @@
-// Keep in sync with `hayro-postscript/src/string/ascii_85.rs`.
+// Keep in sync with `hayro-syntax/src/filter/ascii_85.rs`.
 
-use crate::reader::Reader;
-use crate::trivia::is_white_space_character;
+use crate::reader::{Reader, is_whitespace};
 use alloc::vec::Vec;
 
-pub(crate) fn decode(data: &[u8]) -> Option<Vec<u8>> {
+pub(crate) fn decode_into(data: &[u8], out: &mut Vec<u8>) -> Option<()> {
     const POW_85: [u32; 5] = [52200625, 614125, 7225, 85, 1];
 
     let mut reader = Reader::new(data);
@@ -14,7 +13,7 @@ pub(crate) fn decode(data: &[u8]) -> Option<Vec<u8>> {
             let b = reader.read_byte()?;
 
             // White space characters should be ignored.
-            if !is_white_space_character(b) {
+            if !is_whitespace(b) {
                 return Some(b);
             }
         }
@@ -55,15 +54,15 @@ pub(crate) fn decode(data: &[u8]) -> Option<Vec<u8>> {
         Some(())
     };
 
-    let mut decoded = Vec::with_capacity(data.len() * 4 / 5);
+    out.reserve(data.len() * 4 / 5);
     let mut group = Vec::with_capacity(5);
 
     loop {
         let Some(b) = read_byte() else {
             // Be lenient and accept what we have (see PDFBOX-5910).
-            flush_group(&mut group, &mut decoded)?;
+            flush_group(&mut group, out)?;
 
-            return Some(decoded);
+            return Some(());
         };
 
         match b {
@@ -71,19 +70,19 @@ pub(crate) fn decode(data: &[u8]) -> Option<Vec<u8>> {
                 group.push(b);
 
                 if group.len() == 5 {
-                    flush_group(&mut group, &mut decoded)?;
+                    flush_group(&mut group, out)?;
                 }
             }
             b'z' => {
-                flush_group(&mut group, &mut decoded)?;
-                decoded.extend_from_slice(&[0, 0, 0, 0]);
+                flush_group(&mut group, out)?;
+                out.extend_from_slice(&[0, 0, 0, 0]);
             }
             b'~' => {
                 // Technically requires a '>', but there is a PDF where it isn't
                 // appended and decodes fine in other viewers.
-                flush_group(&mut group, &mut decoded)?;
+                flush_group(&mut group, out)?;
 
-                return Some(decoded);
+                return Some(());
             }
             _ => return None, // Invalid character.
         }
