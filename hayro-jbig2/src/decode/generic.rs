@@ -493,6 +493,10 @@ pub(crate) fn decode_bitmap_arithmetic_coding(
     tpgdon: bool,
     adaptive_template_pixels: &[AdaptiveTemplatePixel; 4],
 ) -> Result<()> {
+    if bitmap.width == 0 || bitmap.height == 0 {
+        return Ok(());
+    }
+
     let mut ctx_gatherer = ContextGatherer::new(template, adaptive_template_pixels);
 
     // See Figure 8 - 11.
